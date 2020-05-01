@@ -34,7 +34,9 @@ public class JDBCMySQLToIRISViaXML {
 		String strXmlFile = "";
 		
 		try {
-			myIris = new MySqlToIrisViaXml();
+			myIris = new MySqlToIrisViaXml("jdbc:mysql://localhost:3306/classicmodels", "root", "mysqlcommunity2020",
+					"jdbc:iris://146.148.90.135:19517/USER", "tech", "demo");
+			
 			sql = "Select employeeNumber,Concat(lastName, \", \", firstName) As employee, extension, email, officeCode, reportsTo, jobTitle\n" + 
 					"From employees";
 			
@@ -55,7 +57,7 @@ public class JDBCMySQLToIRISViaXML {
 		}
 		finally {
 			if(myIris != null) {
-				System.out.println("\nConnection released.");
+				System.out.println("\nConnection closed.");
 				myIris.closeConnection();
 			}
 		}
@@ -116,17 +118,76 @@ public class JDBCMySQLToIRISViaXML {
 
 class MySqlToIrisViaXml {
 	
-	private String strMySqlUrl = "jdbc:mysql://localhost:3306/classicmodels";//URL of MySql local instance and schema.
-	private String strIrisUrl = "jdbc:iris://146.148.90.135:19517/USER";//URL of IRIS external instance and schema.
+	private String strMySqlUrl;//URL of MySql local instance and schema.
+	private String strIrisUrl;//URL of IRIS external instance and schema.
 	
-	private String strMySqlUsername = "root";//MySql username.
-	private String strMySqlPassword = "mysqlcommunity2020";//MySql password.
+	private String strMySqlUsername;//MySql username.
+	private String strMySqlPassword;//MySql password.
 	
-	private String strIrisUsername = "tech";//Iris username.
-	private String strIrisPassword = "demo";//Iris password.
+	private String strIrisUsername;//Iris username.
+	private String strIrisPassword;//Iris password.
 	
-	private Connection connection = null;
+	private Connection mySqlConnection = null;
 	
+	public MySqlToIrisViaXml(String strMySqlUrl, String strMySqlUsername,String strMySqlPassword, 
+			String strIrisUrl, String strIrisUsername, String strIrisPassword) {
+		this.strMySqlUrl = strMySqlUrl;
+		this.strMySqlUsername = strMySqlUsername;
+		this.strMySqlPassword = strMySqlPassword;
+		
+		this.strIrisUrl = strIrisUrl;
+		this.strIrisUsername = strIrisUsername;
+		this.strIrisPassword = strIrisPassword;
+	}
+	
+	public String getStrMySqlUrl() {
+		return strMySqlUrl;
+	}
+
+	public void setStrMySqlUrl(String strMySqlUrl) {
+		this.strMySqlUrl = strMySqlUrl;
+	}
+
+	public String getStrIrisUrl() {
+		return strIrisUrl;
+	}
+
+	public void setStrIrisUrl(String strIrisUrl) {
+		this.strIrisUrl = strIrisUrl;
+	}
+
+	public String getStrMySqlUsername() {
+		return strMySqlUsername;
+	}
+
+	public void setStrMySqlUsername(String strMySqlUsername) {
+		this.strMySqlUsername = strMySqlUsername;
+	}
+
+	public String getStrMySqlPassword() {
+		return strMySqlPassword;
+	}
+
+	public void setStrMySqlPassword(String strMySqlPassword) {
+		this.strMySqlPassword = strMySqlPassword;
+	}
+
+	public String getStrIrisUsername() {
+		return strIrisUsername;
+	}
+
+	public void setStrIrisUsername(String strIrisUsername) {
+		this.strIrisUsername = strIrisUsername;
+	}
+
+	public String getStrIrisPassword() {
+		return strIrisPassword;
+	}
+
+	public void setStrIrisPassword(String strIrisPassword) {
+		this.strIrisPassword = strIrisPassword;
+	}
+
 	/**
 	 * Connects to MySql server to retrieve records.
 	 * @param sql select statement.
@@ -138,8 +199,8 @@ class MySqlToIrisViaXml {
 		ResultSet resultSet = null;
 		
 		try {
-			connection = DriverManager.getConnection(strMySqlUrl, strMySqlUsername, strMySqlPassword);
-			preparedStatement = connection.prepareStatement(sql);
+			mySqlConnection = DriverManager.getConnection(strMySqlUrl, strMySqlUsername, strMySqlPassword);
+			preparedStatement = mySqlConnection.prepareStatement(sql);
 			resultSet = preparedStatement.executeQuery();
 		}
 		catch(SQLTimeoutException timeEx) {
@@ -161,8 +222,8 @@ class MySqlToIrisViaXml {
 	 */
 	public void closeConnection() {
 		try {
-			if(connection != null) {
-				connection.close();
+			if(mySqlConnection != null) {
+				mySqlConnection.close();
 			}
 		}
 		catch(Exception ex) {
