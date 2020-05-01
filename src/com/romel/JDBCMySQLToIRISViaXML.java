@@ -3,7 +3,7 @@ package com.romel;
 //Intersystems IRIS JDBC package.
 import com.intersystems.jdbc.*;
 
-//The JDBC MySQL driver is added into the classpath.
+//The JDBC MySQL and Intersystems IRIS drivers are added into the buildpath/classpath.
 
 //Java SQL packages.
 import java.sql.DriverManager;
@@ -37,12 +37,39 @@ public class JDBCMySQLToIRISViaXML {
 			myIris = new MySqlToIrisViaXml();
 			sql = "Select employeeNumber,Concat(lastName, \", \", firstName) As employee, extension, email, officeCode, reportsTo, jobTitle\n" + 
 					"From employees";
-		
-			ResultSet resultSet = myIris.getResultMySql(sql);
-		 
+			
+			int i = displayMySqlEmployees(myIris, sql);
+			
 			/**If the employees table in MySQL is not empty, 
 			 * then continue with the rest of the procedure, ie write to xml and IRIS database.
 			 */
+			if(i > 0) {
+				
+			}
+			else {
+				System.out.println("\nThere are no employee records to display.");
+			}
+		}
+		catch(Exception ex) {
+			System.out.println("Exception in -> " + ex.getMessage());
+		}
+		finally {
+			if(myIris != null) {
+				System.out.println("\nConnection released.");
+				myIris.closeConnection();
+			}
+		}
+
+	}//end main.
+	
+	private static int displayMySqlEmployees(MySqlToIrisViaXml myIris, String sql) {
+		
+		ResultSet resultSet = null;
+		int iResultCount = 0;//Count the number of records retrieved from the query.
+		
+		try {
+			resultSet = myIris.getMySqlEmployeeResultSet(sql);
+		 
 			if(resultSet != null || resultSet.isBeforeFirst()) {
 				
 				//Display employee records from MySQL.
@@ -51,8 +78,6 @@ public class JDBCMySQLToIRISViaXML {
 						"Email", "Office Code", "Reports To", "Job Title");
 				System.out.println("--------------------------------------------------------------------------"
 						+"--------------------------------------------------------------------------");
-				
-				int iResultCount = 0;
 				
 				while(resultSet.next()) {
 					System.out.printf("%-20s %-30s %-12s %-35s %-20s %-20s %-20s\n", resultSet.getString(1), resultSet.getString(2), 
@@ -73,13 +98,19 @@ public class JDBCMySQLToIRISViaXML {
 			System.out.println("Exception in -> " + ex.getMessage());
 		}
 		finally {
-			if(myIris != null) {
-				System.out.println("\nConnection released.");
-				myIris.closeConnection();
+			try {
+				if(resultSet != null) {
+					resultSet.close();
+				}
+			}
+			catch(Exception ex) {
+				System.out.println("Exception -> " + ex.getMessage());
 			}
 		}
-
-	}
+		
+		return iResultCount;
+		
+	}//end displayMySqlEmployees.
 	
 }//end class
 
@@ -101,7 +132,7 @@ class MySqlToIrisViaXml {
 	 * @param sql select statement.
 	 * @return result of the query.
 	 */
-	public ResultSet getResultMySql(String sql) {
+	public ResultSet getMySqlEmployeeResultSet(String sql) {
 		
 		PreparedStatement preparedStatement= null;
 		ResultSet resultSet = null;
@@ -112,7 +143,7 @@ class MySqlToIrisViaXml {
 			resultSet = preparedStatement.executeQuery();
 		}
 		catch(SQLTimeoutException timeEx) {
-			
+			System.out.println("Exception in " + this.getClass().getSimpleName() + " -> " + timeEx.getMessage());
 		}
 		catch(SQLException sqlEx) {
 			System.out.println("Exception in " + this.getClass().getSimpleName() + " -> " + sqlEx.getMessage());
