@@ -17,6 +17,10 @@ import java.sql.SQLTimeoutException;
 import org.w3c.dom.*;
 import javax.xml.parsers.*;
 import java.io.File;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 /**
  * A Java program that retrieves the employee records from a MySQL schema and writes the results to an xml file. 
@@ -29,24 +33,37 @@ public class JDBCMySQLToIRISViaXML {
 
 	public static void main(String[] args) {	
 		MySqlToIrisViaXml myIris = null;
-		String sql;
+		String strEmployeeSelect;
+		String strPersonSelect;
 		String strXmlFile = "/users/kubi/documents/employees2.xml";
 		
 		try {
 			myIris = new MySqlToIrisViaXml("jdbc:mysql://localhost:3306/classicmodels", "root", "mysqlcommunity2020",
-					"jdbc:IRIS://146.148.90.135:19517/USER", "tech", "demo");
+					"jdbc:IRIS://104.197.75.13:26180/USER", "tech", "demo");
 			
-			sql = "Select employeeNumber,lastName, firstName, extension, email, officeCode, reportsTo, jobTitle\n" + 
+			strEmployeeSelect = "Select employeeNumber,lastName, firstName, extension, email, officeCode, reportsTo, jobTitle\n" + 
 					"From employees";
 			
 			//Display employee records from MySQL database. 
-			int i = displayMySqlEmployees(myIris, sql);
+			int i = displayMySqlEmployees(myIris, strEmployeeSelect);
 			
 			/**If the employees table in MySQL is not empty, 
 			 * then continue with the rest of the procedure, ie write to xml and IRIS database.
 			 */
 			if(i > 0) {
+				System.out.println("\nNumber of records fetched -> " + i);
 				//Display Person records from IRIS database.
+				strPersonSelect = "Select ID, FirstName, LastName, Phonenumber From Demo.Person";
+				
+				i = displayIrisPerson(myIris, strPersonSelect);
+				System.out.println("\nNumber of records fetched -> " + i);
+				
+				if(myIris.readMySQLEmployeesToXML(myIris.getMySqlResultSet(strEmployeeSelect), strXmlFile)) {
+					System.out.println("\nSuccessfully written employee records to file ('firstName', 'lastName', 'extension') -> " + strXmlFile);
+				}
+				else {
+					System.out.println("\nUnable to write employee records to XML file -> " + strXmlFile);
+				}
 			}
 			else {
 				System.out.println("\nThere are no employee records to display.");
@@ -79,7 +96,7 @@ public class JDBCMySQLToIRISViaXML {
 			if(resultSet != null || resultSet.isBeforeFirst()) {
 				
 				//Display employee records from MySQL.
-				System.out.println("List of employees from MySQL - classicmodels schema:\n");
+				System.out.println("\nList of employees from MySQL - classicmodels schema:\n");
 				System.out.printf("%-20s %-30s %-12s %-35s %-20s %-20s %-20s\n", "Employee Number", "Employee", "Extension",
 						"Email", "Office Code", "Reports To", "Job Title");
 				System.out.println("--------------------------------------------------------------------------"
@@ -93,11 +110,8 @@ public class JDBCMySQLToIRISViaXML {
 							resultSet.getString(8));
 					
 					iResultCount ++;
-				}//end while
-				
-				System.out.println("\nNumber of employees retrieved -> " + Integer.toString(iResultCount));
-				
-			}//end if
+				}
+			}
 		}
 		catch(SQLException sqlEx) {
 			System.out.println("Exception in -> " +  sqlEx.getMessage());
@@ -125,35 +139,30 @@ public class JDBCMySQLToIRISViaXML {
 	 * @param SQL statement
 	 * @return Number of records retrieved.
 	 */
-	private static int displayIRISPerson(MySqlToIrisViaXml myIris, String sql) {
+	private static int displayIrisPerson(MySqlToIrisViaXml myIris, String sql) {
 		ResultSet resultSet = null;
 		int iResultCount = 0;//Count the number of records retrieved from the query.
 		
 		try {
-			resultSet = myIris.getIRISResultSet(sql);
+			resultSet = myIris.getIrisResultSet(sql);
 		 
 			if(resultSet != null || resultSet.isBeforeFirst()) {
 				
 				//Display employee records from MySQL.
-				System.out.println("List of employees from MySQL - classicmodels schema:\n");
-				System.out.printf("%-20s %-30s %-12s %-35s %-20s %-20s %-20s\n", "Employee Number", "Employee", "Extension",
-						"Email", "Office Code", "Reports To", "Job Title");
+				System.out.println("\nList of Persons from IRIS - Demo schema:\n");
+				System.out.printf("%-20s %-20s %-20s %-20s\n", "ID", "FirstName", "LastName",
+						"Phonenumber");
 				System.out.println("--------------------------------------------------------------------------"
 						+"--------------------------------------------------------------------------");
 				
 				while(resultSet.next()) {
-					System.out.printf("%-20s %-30s %-12s %-35s %-20s %-20s %-20s\n", resultSet.getString(1), 
+					System.out.printf("%-20s %-20s %-20s %-20s\n", resultSet.getString(1), 
 							resultSet.getString(2) + ", " + resultSet.getString(3), 
-							resultSet.getString(4), resultSet.getString(5),
-							resultSet.getString(6), resultSet.getString(7), 
-							resultSet.getString(8));
+							resultSet.getString(4));
 					
 					iResultCount ++;
-				}//end while
-				
-				System.out.println("\nNumber of employees retrieved -> " + Integer.toString(iResultCount));
-				
-			}//end if
+				}
+			}
 		}
 		catch(SQLException sqlEx) {
 			System.out.println("Exception in -> " +  sqlEx.getMessage());
@@ -318,7 +327,7 @@ class MySqlToIrisViaXml {
 	 * @param sql select statement.
 	 * @return result of the query.
 	 */
-	public ResultSet getIRISResultSet(String sql) {
+	public ResultSet getIrisResultSet(String sql) {
 		PreparedStatement preparedStatement= null;
 		ResultSet resultSet = null;
 		
@@ -339,11 +348,45 @@ class MySqlToIrisViaXml {
 		return resultSet;
 	}
 	
-	public boolean readMySQLEmployeesToXML() {
+	/**
+	 * Reads the employee records from MySQL database and write them to an xml file.
+	 * @return True if records were successfully written to an xml file.
+	 */
+	public boolean readMySQLEmployeesToXML(ResultSet resultSet, String strXmlFile) {
 		boolean boolIsReadToXMLSuccessful = true;
 		
 		try {
+			DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+			Document document = documentBuilder.newDocument();
 			
+			//Create the root element.
+			Element elePersons = document.createElement("Persons");
+			
+			//Traverse thru the recordset to create sub elements.
+			while(resultSet.next()) {
+				Element elePerson = document.createElement("person");
+				
+				Element eleFirstName = document.createElement("FirstName");
+				eleFirstName.appendChild(document.createTextNode(resultSet.getString("firstName")));
+				elePerson.appendChild(eleFirstName);
+				
+				Element eleLastName = document.createElement("LastName");
+				eleLastName.appendChild(document.createTextNode(resultSet.getString("lastName")));
+				elePerson.appendChild(eleLastName);
+				
+				Element elePhoneNumber = document.createElement("PhoneNumber");
+				elePhoneNumber.appendChild(document.createTextNode(resultSet.getString("extension")));
+				elePerson.appendChild(elePhoneNumber);
+				
+				elePersons.appendChild(elePerson);
+			}
+			
+			document.appendChild(elePersons);
+			
+			//Persist xml dom to file.
+			Transformer transformer = TransformerFactory.newInstance().newTransformer();
+			DOMSource domSource = new DOMSource(document);
+			transformer.transform(domSource, new StreamResult(new File(strXmlFile)));
 		}
 		catch(Exception ex) {
 			boolIsReadToXMLSuccessful = false;
