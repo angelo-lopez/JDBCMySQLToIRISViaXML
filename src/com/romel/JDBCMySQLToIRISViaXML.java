@@ -35,6 +35,7 @@ public class JDBCMySQLToIRISViaXML {
 		MySqlToIrisViaXml myIris = null;
 		String strEmployeeSelect;
 		String strPersonSelect;
+		String strPersonInsert;
 		String strXmlFile = "/users/kubi/documents/employees2.xml";
 		
 		try {
@@ -58,7 +59,7 @@ public class JDBCMySQLToIRISViaXML {
 				i = displayIrisPerson(myIris, strPersonSelect);
 				System.out.println("\nNumber of records fetched -> " + i);
 				
-				if(myIris.readMySQLEmployeesToXML(myIris.getMySqlResultSet(strEmployeeSelect), strXmlFile)) {
+				if(myIris.writeEmployeesToXml(myIris.getMySqlResultSet(strEmployeeSelect), strXmlFile)) {
 					System.out.println("\nSuccessfully written employee records to file ('firstName', 'lastName', 'extension') -> " + strXmlFile);
 				}
 				else {
@@ -352,8 +353,8 @@ class MySqlToIrisViaXml {
 	 * Reads the employee records from MySQL database and write them to an xml file.
 	 * @return True if records were successfully written to an xml file.
 	 */
-	public boolean readMySQLEmployeesToXML(ResultSet resultSet, String strXmlFile) {
-		boolean boolIsReadToXMLSuccessful = true;
+	public boolean writeEmployeesToXml(ResultSet resultSet, String strXmlFile) {
+		boolean isWriteToXMLSuccessfull = true;
 		
 		try {
 			DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -389,11 +390,45 @@ class MySqlToIrisViaXml {
 			transformer.transform(domSource, new StreamResult(new File(strXmlFile)));
 		}
 		catch(Exception ex) {
-			boolIsReadToXMLSuccessful = false;
+			isWriteToXMLSuccessfull = false;
 			ex.printStackTrace();
 		}
 		
-		return boolIsReadToXMLSuccessful;
+		return isWriteToXMLSuccessfull;
+	}
+	
+	/**
+	 * Reads employee elements from an xml file and writes to a remote Iris database.
+	 * @param strXmlFile The xml file to read from.
+	 * @return True if elements are successfully inserted to a remote Iris database.
+	 */
+	public boolean writeXmlToIris(String strXmlFile) {
+		boolean isWriteToIrisSuccessfull = true;
+		String strPersonInsert = "";
+		
+		try {
+			PreparedStatement preparedStatement = irisConnection.prepareStatement(strPersonInsert);
+			
+			DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+			Document document = documentBuilder.parse(strXmlFile);
+			document.normalize();
+			
+			NodeList nodeList = document.getElementsByTagName("person");
+			
+			for(int i = 0; i < nodeList.getLength(); i ++) {
+				Node node = nodeList.item(i);
+				
+				if(node.getNodeType() == Node.ENTITY_NODE) {
+					
+				}
+			}
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+			isWriteToIrisSuccessfull = false;
+		}
+		
+		return isWriteToIrisSuccessfull;
 	}
 	
 	/**
