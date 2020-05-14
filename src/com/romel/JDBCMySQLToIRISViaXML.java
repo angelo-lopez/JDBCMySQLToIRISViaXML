@@ -35,6 +35,7 @@ public class JDBCMySQLToIRISViaXML {
 		MySqlToIrisViaXml myIris = null;
 		String strEmployeeSelect;
 		String strPersonSelect;
+		String strPersonInsert;
 		String strXmlFile = "/users/kubi/documents/employees2.xml";
 		
 		try {
@@ -58,8 +59,18 @@ public class JDBCMySQLToIRISViaXML {
 				i = displayIrisPerson(myIris, strPersonSelect);
 				System.out.println("\nNumber of records fetched -> " + i);
 				
-				if(myIris.readMySQLEmployeesToXML(myIris.getMySqlResultSet(strEmployeeSelect), strXmlFile)) {
+				if(myIris.writeEmployeesToXml(myIris.getMySqlResultSet(strEmployeeSelect), strXmlFile)) {
 					System.out.println("\nSuccessfully written employee records to file ('firstName', 'lastName', 'extension') -> " + strXmlFile);
+					
+					if(myIris.writeXmlToIris(strXmlFile) > 0) {
+						System.out.println("\nSuccessfully written xml elements to the IRIS database.");
+						
+						i = displayIrisPerson(myIris, strPersonSelect);
+						System.out.println("\nNumber of records fetched -> " + i);
+					}
+					else {
+						System.out.println("\nNo records were added to the IRIS database.");
+					}
 				}
 				else {
 					System.out.println("\nUnable to write employee records to XML file -> " + strXmlFile);
@@ -156,8 +167,8 @@ public class JDBCMySQLToIRISViaXML {
 						+"--------------------------------------------------------------------------");
 				
 				while(resultSet.next()) {
-					System.out.printf("%-20s %-20s %-20s %-20s\n", resultSet.getString(1), 
-							resultSet.getString(2) + ", " + resultSet.getString(3), 
+					System.out.printf("%-20d %-20s %-20s %-20s\n", resultSet.getInt(1), 
+							resultSet.getString(2), resultSet.getString(3), 
 							resultSet.getString(4));
 					
 					iResultCount ++;
@@ -165,9 +176,11 @@ public class JDBCMySQLToIRISViaXML {
 			}
 		}
 		catch(SQLException sqlEx) {
+			sqlEx.printStackTrace();
 			System.out.println("Exception in -> " +  sqlEx.getMessage());
 		}
 		catch(Exception ex) {
+			ex.printStackTrace();
 			System.out.println("Exception in -> " + ex.getMessage());
 		}
 		finally {
@@ -352,8 +365,8 @@ class MySqlToIrisViaXml {
 	 * Reads the employee records from MySQL database and write them to an xml file.
 	 * @return True if records were successfully written to an xml file.
 	 */
-	public boolean readMySQLEmployeesToXML(ResultSet resultSet, String strXmlFile) {
-		boolean boolIsReadToXMLSuccessful = true;
+	public boolean writeEmployeesToXml(ResultSet resultSet, String strXmlFile) {
+		boolean isWriteToXMLSuccessfull = true;
 		
 		try {
 			DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -389,11 +402,52 @@ class MySqlToIrisViaXml {
 			transformer.transform(domSource, new StreamResult(new File(strXmlFile)));
 		}
 		catch(Exception ex) {
-			boolIsReadToXMLSuccessful = false;
+			isWriteToXMLSuccessfull = false;
 			ex.printStackTrace();
 		}
 		
-		return boolIsReadToXMLSuccessful;
+		return isWriteToXMLSuccessfull;
+	}
+	
+	/**
+	 * Reads employee elements from an xml file and writes to a remote Iris database.
+	 * @param strXmlFile The xml file to read from.
+	 * @return True if elements are successfully inserted to a remote Iris database.
+	 */
+	public int writeXmlToIris(String strXmlFile) {
+		int iRecordsAffected = 0;
+		String strPersonInsert = "Insert Into Demo.Person (FirstName, LastName, Phonenumber) " + 
+				"Values (?, ?, ?)";
+		
+		try {
+			PreparedStatement preparedStatement = irisConnection.prepareStatement(strPersonInsert);
+			
+			DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+			Document document = documentBuilder.parse(strXmlFile);
+			document.normalize();
+			
+			NodeList nodeList = document.getElementsByTagName("person");
+			
+			for(int i = 0; i < nodeList.getLength(); i ++) {
+				Node node = nodeList.item(i);
+				
+				if(node.getNodeType() == Node.ELEMENT_NODE) {
+					Element element = (Element) node;
+					
+					preparedStatement.setString(1, element.getElementsByTagName("FirstName").item(0).getTextContent());
+					preparedStatement.setString(2, element.getElementsByTagName("LastName").item(0).getTextContent());
+					preparedStatement.setString(3, element.getElementsByTagName("PhoneNumber").item(0).getTextContent());
+					preparedStatement.addBatch();
+				}
+			}
+			
+			iRecordsAffected = preparedStatement.executeBatch().length;
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+		}
+		
+		return iRecordsAffected;
 	}
 	
 	/**
