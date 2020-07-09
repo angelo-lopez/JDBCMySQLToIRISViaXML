@@ -35,7 +35,6 @@ public class JDBCMySQLToIRISViaXML {
 		MySqlToIrisViaXml myIris = null;
 		String strEmployeeSelect;
 		String strPersonSelect;
-		String strPersonInsert;
 		String strXmlFile = "/users/kubi/documents/employees2.xml";
 		
 		try {
